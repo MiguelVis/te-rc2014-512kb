@@ -24,6 +24,7 @@
 
 	05 Apr 2021 : Moved from te.h.
 	11 May 2021 : Remove default key names.
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 	
 	Notes:
 
@@ -99,4 +100,3 @@
 #define ESC   27
 #define DEL   127
 
-

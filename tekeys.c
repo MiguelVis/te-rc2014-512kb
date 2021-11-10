@@ -29,12 +29,23 @@
 	04 Apr 2021 : Remove customized key names. Use key bindings from configuration.
 	11 May 2021 : Update keys purposes.
 	10 Jul 2021 : Remove SetKey().
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 */
+
+#include <te.h>
+#include <tekeys.h>
+#include <ctype.h>
+
+int CrtIn(void);
+extern unsigned char cf_keys[];
+extern unsigned char cf_keys_ex[];
+extern char cf_cr_name[];
+extern char cf_esc_name[];
 
 /* Return key name
    ---------------
 */
-GetKeyName(key)
+char* GetKeyName(key)
 int key;
 {
 	switch(key)
@@ -49,8 +60,7 @@ int key;
 /* Return key purpose
    ------------------
 */
-GetKeyWhat(key)
-int key;
+char* GetKeyWhat(int key)
 {
 	/* Max. length of 8 chars., see MenuHelp() */
 	 
@@ -105,34 +115,50 @@ int key;
 /* Return key from keyboard, according to key bindings
    ---------------------------------------------------
 */
-GetKey()
+int GetKey(void)
 {
-	int c, x, i, k;
+	char c, x, tmp;
+	int i,k;
 
 	c = CrtIn();
 
-	if(c > 31 && c != 127) {
+	if(c > 31 && c != 127) 
 		return c;
-	}
 
-	for(i = 0; i < KEYS_MAX; ++i) {
-		if(cf_keys[i]) {
-			if(c == cf_keys[i]) {
-				if(cf_keys_ex[i]) {
-					x = toupper(CrtIn());
+	for(i = 0; i < KEYS_MAX; ++i) 
+	{
+		if(cf_keys[i]) 
+		{
+			if(c == cf_keys[i]) 
+			{
+				if(cf_keys_ex[i]) 
+				{
+					tmp=CrtIn();
+
+      					if (isalpha(tmp))
+      					{
+        				  if (islower(tmp))
+          					tmp=toupper(tmp);
+      					}
+
+					x = tmp;
 					
 					/* TODO: try to optimize the following */
 
-					for(k = i; k < KEYS_MAX; ++k) {
-						if(c == cf_keys[k]) {
-							if(x == cf_keys_ex[k]) {
+					for(k = i; k < KEYS_MAX; ++k) 
+					{
+						if(c == cf_keys[k]) 
+						{
+							if(x == cf_keys_ex[k]) 
+							{
 								return k + 1000;
 							}
 						}
 					}
 					break;
 				}
-				else {
+				else 
+				{
 					return i + 1000;
 				}
 			}
@@ -141,5 +167,3 @@ GetKey()
 
 	return '?';
 }
-
-

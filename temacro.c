@@ -30,7 +30,20 @@
 	01 Jul 2021 : Change macro symbol names to match key bindings names.
 	06 Jul 2021 : Optimize MacroGet() a bit.
 	25 Sep 2021 : Added MacroIsCmdChar(). Allow comments as {# comment}. Send '\0' from MacroStop().
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 */
+
+#include <te.h>
+#include <tekeys.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+extern FILE *mac_fp;  /* FP for a file macro, or NULL */
+
+void ErrLine(char*);
+int MatchStr(char*, char*);
+int ForceCh(char ch);
 
 /* Run a macro from file
    ---------------------
@@ -163,7 +176,10 @@ MacroGet()
 		/* Get symbol name like {up} or {up:12} --> "up" */
 		for(i = 0; MacroIsCmdChar(ch = MacroGetRaw()) && i < MAC_SYM_MAX; ++i)
 		{
-			sym[i] = tolower(ch);
+			if (isalpha(ch))		
+				sym[i] = tolower(ch);	
+			else				
+				sym[i] = ch;		
 		}
 
 		if(i)

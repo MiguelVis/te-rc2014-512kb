@@ -41,13 +41,111 @@
 	08 Apr 2021 : Get adaptation (port) name from configuration.
 	05 Jul 2021 : Support for OPT_Z80.
 	25 Sep 2021 : Added SysLineEdit(). Fix URLs.
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 */
+
+#include <te.h>
+#include <tekeys.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <dynm512.h>
+
+extern int help_items[];
+extern char file_name[FILENAME_MAX];
+extern char cf_name[];
+extern unsigned char cf_rows;
+extern unsigned char cf_cols;
+extern int cf_mx_lines;
+extern unsigned char cf_tab_cols;
+extern unsigned char cf_num;
+extern unsigned char cf_clang;
+extern unsigned char cf_indent;
+extern unsigned char cf_list;
+extern char cf_list_chr[];
+extern char cf_cr_name[];
+extern char cf_esc_name[];
+extern unsigned char cf_keys[];
+extern unsigned char cf_keys_ex[];
+extern unsigned char cf_rul_chr;
+extern unsigned char cf_rul_tab;
+extern unsigned char cf_vert_chr;
+extern unsigned char cf_horz_chr;
+extern unsigned char cf_lnum_chr;
+extern unsigned int cf_start;
+extern unsigned char cf_version;
+extern int cf_bytes;
+extern int box_rows; /* Height in lines */
+extern int box_shr;  /* Vertical   position of cursor in the box (0..box_rows - 1) */
+extern int box_shc;  /* Horizontal position of cursor in the box (0..cf_cols - 1) */
+extern char** lp_arr; 			/* Pointer of Text lines pointers array */
+extern char  lp_arr_bank; 		/* Text lines pointers array's dynamic memory bank */
+extern char* lp_arr_i_bank; 		/* Pointer of Text lines dynamic memory banks array */
+extern char  lp_arr_i_bank_bank;	/* Text lines dynamic memory banks array's dynamic memory bank */
+extern int   lp_now; /* How many lines are in the array */
+extern int   lp_cur; /* Current line */
+extern int   lp_chg; /* 0 if no changes are made */
+extern char ln_dat[]; /* Data buffer */
+extern int   ln_max; /* Max. # of characters */
+extern int fe_dat[];   /* Data buffer */
+extern int fe_now;    /* How many characters are now in the buffer */
+extern int fe_set;    /* Set position */
+extern int fe_get;    /* Get position */
+extern int fe_forced; /* Flag: true if forced character on input */
+extern int sysln;    /* NZ when written - for Loop() */
+extern int editln;   /* NZ when editing line - for ErrLine() */
+
+extern int tmp;
+extern char* ptmp;
+extern char  tmpbuf[];
+extern char  bank;
+
+#if OPT_BLOCK
+
+extern int blk_start;   /* Start line # */
+extern int blk_end;     /* End line # */
+extern int blk_count;   /* # of lines */
+extern char* clp_arr[];		/* Pointer of Multi-line clipboard lines pointers array */
+extern char* clp_arr_i_bank;	/* Pointer of Multi-line clipboard lines memory banks array */
+
+#else
+
+extern char *clp_line;  /* Just one line */
+extern char clp_line_bank;
+
+#endif
+
+#if OPT_FIND
+
+extern char find_str[FIND_MAX];
+
+#endif
+
+void CrtOut(int);
+char* GetKeyWhat(int key);
+int WriteFile(char* fn);
+int ReadFile(char* fn);
+char* CurrentFile(void);
+int GetKey(void);
+int ReadLine(char* buf, int width);
+int GetFirstLine(void);
+int GetLastLine(void);
+int MenuExit(void);
+void MenuAbout(void);
+void MenuHelpCh(char ch);
+void MenuHelp(void);
+int MenuSaveAs(void);
+int MenuSave(void);
+int MenuOpen(void);
+int MenuNew(void);
+int Menu(void);
+void MenuFreeMemory(void);
 
 /* Read character from keyboard
    ----------------------------
 */
 /* **************************** SEE #define
-getchr()
+int getchr()
 {
 	return GetKey();
 }
@@ -71,38 +169,28 @@ int ch;
 /* putchrx(ch, n) */
 /* int ch, n;     */
 #asm
-putchrx:
-	pop  bc
-	pop  de
-	pop  hl
-	push hl
-	push de
-	push bc
-
-putchrx1:	
-	ld   a,d
-	or   e
-	ret  z
-	
-	dec  de
-	
-	push de
-	push hl
-	
-	call CrtOut
-	
-	pop  hl
-	pop  de
-	
-	jr   putchrx1
+psect text
+global _CrtOut
+global _putchrx
+_putchrx:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)  ;ch
+        inc     hl
+        inc     hl
+        ld      b,(hl)  ;n
+1:      push    bc
+        call    _CrtOut
+        pop     bc
+        djnz    1b
+        ret
 #endasm
 #else
 putchrx(ch, n)
 int ch, n;
 {
-	while(n--) {
+	while(n--) 
 		putchr(ch);
-	}
 }
 #endif
 
@@ -113,30 +201,26 @@ int ch, n;
 /* putstr(s) */
 /* char *s;  */
 #asm
-putstr:
-	pop  bc
-	pop  hl
-	push hl
-	push bc
-	
-putstr1:
-	ld   a,(hl)
-	or   a
-	ret  z
-	
-	inc  hl
-	push hl
-	
-	ld   h,0
-	ld   l,a
-	push hl
-	
-	call CrtOut
-	
-	pop  de
-	pop  hl
-	
-	jr   putstr1
+psect text
+global _putstr
+_putstr:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        ex      de,hl
+1:      ld      a,(hl)
+        or      a
+        ret     z
+        inc     hl
+        ld      c,a
+        push    hl
+        push    bc
+        call    _CrtOut
+        pop     bc
+        pop     hl
+        jr      1b
 #endasm
 #else
 putstr(s)
@@ -165,7 +249,6 @@ char *format; int value;
 	char r[7]; /* -12345 + ZERO */
 
 	sprintf(r, format, value);
-
 	putstr(r);
 }
 
@@ -225,9 +308,7 @@ ShowFilename()
 	char *s;
 
 	CrtLocate(PS_ROW, PS_FNAME);
-
 	putstr((s = CurrentFile()));
-
 	putchrx(' ', FILENAME_MAX - strlen(s) - 1);
 }
 
@@ -260,7 +341,7 @@ SysLineEdit()
    -------------------------------------
    Message can be NULL. Returns NZ if CR, else Z.
 */
-SysLineWait(s, cr, esc)
+int SysLineWait(s, cr, esc)
 char *s, *cr, *esc;
 {
 	int ch;
@@ -382,9 +463,7 @@ SysLineChanges()
    ----------------
    Returns last character entered: INTRO or ESC.
 */
-ReadLine(buf, width)
-char *buf;
-int width;
+int ReadLine(char* buf, int width)
 {
 	int len;
 	int ch;
@@ -418,7 +497,7 @@ int width;
 /* Return name of current file
    ---------------------------
 */
-CurrentFile()
+char* CurrentFile()
 {
 	return (file_name[0] ? file_name : "-");
 }
@@ -458,33 +537,35 @@ int row, sel;
 
 	line = GetFirstLine() + row;
 
-	for(i = row; i < box_rows; ++i) {
-		if(line >= blk_start) {
-			if(line <= blk_end) {
+	for(i = row; i < box_rows; ++i) 
+	{
+		if(line >= blk_start) 
+		{
+			if(line <= blk_end) 
+			{
 #if CRT_CAN_REV
 				CrtLocate(BOX_ROW + i, cf_num);
 				CrtClearEol();
 
-				if(sel) {
+				if(sel) 
 					CrtReverse(1);
-				}
-
-				putstr(lp_arr[line]);
+				
+				setbank(lp_arr_bank);
+				ptmp = lp_arr[line];
+				setbank(lp_arr_i_bank_bank);
+				setbank(lp_arr_i_bank[line]);
+				putstr(ptmp);
 				putchr(' ');
 
-				if(sel) {
-
+				if(sel)
 					CrtReverse(0);
-				}
 #else
 				CrtLocate(BOX_ROW + i, cf_cols - 1); putchr(sel ? BLOCK_CHR : ' ');
 #endif
 			}
-			else {
+			else 
 				break;
-			}
 		}
-
 		++line;
 	}
 }
@@ -502,15 +583,13 @@ int row, line;
 	char *format;
 
 #if OPT_BLOCK
-
 	int blk, sel;
 
 	blk = (blk_count && blk_start <= GetLastLine() && blk_end >= GetFirstLine());
 	sel = 0;
-
 #endif
-
-	if(cf_num) {
+	if(cf_num) 
+	{
 		format = "%?d";
 		format[1] = '0' + cf_num - 1;
 	}
@@ -519,18 +598,20 @@ int row, line;
 	{
 		CrtClearLine(BOX_ROW + i);
 
-		if(line < lp_now) {
-
-			if(cf_num) {
-						putint(format, line + 1);
-						putchr(cf_lnum_chr);
+		if(line < lp_now) 
+		{
+			if(cf_num) 
+			{
+				putint(format, line + 1);
+				putchr(cf_lnum_chr);
 			}
-
 #if OPT_BLOCK
-
-			if(blk) {
-				if(line >= blk_start) {
-					if(line <= blk_end) {
+			if(blk) 
+			{
+				if(line >= blk_start) 
+				{
+					if(line <= blk_end) 
+					{
 #if CRT_CAN_REV
 						CrtReverse((sel = 1));
 #else
@@ -539,14 +620,16 @@ int row, line;
 					}
 				}
 			}
-
 #endif
-
-			putstr(lp_arr[line++]);
-
+			setbank(lp_arr_bank);
+			ptmp = lp_arr[line];
+			setbank(lp_arr_i_bank_bank);
+			setbank(lp_arr_i_bank[line]);
+			putstr(ptmp);
+			line++;
 #if OPT_BLOCK
-
-			if(sel) {
+			if(sel) 
+			{
 #if CRT_CAN_REV
 				putchr(' ');
 
@@ -559,7 +642,6 @@ int row, line;
 			}
 
 #endif
-
 		}
 	}
 }
@@ -576,9 +658,10 @@ RefreshAll()
    -------------
    Return NZ to quit program.
 */
-Menu()
+int Menu(void)
 {
 	int run, row, stay, menu, ask;
+	int tmp;
 
 	/* Setup some things */
 	run = stay = menu = ask = 1;
@@ -602,11 +685,13 @@ Menu()
 			CenterText(row++, "save As");
 			CenterText(row++, "Help");
 			CenterText(row++, "aBout te");
+			CenterText(row++, "available Memory");
 			CenterText(row  , "eXit te");
 #else
 			CenterText(row++, "New   Open      Save     Save As");
 			CenterText(row++, "Help  aBout te  eXit te         ");
 #endif
+
 			menu = 0;
 		}
 
@@ -618,12 +703,18 @@ Menu()
 			putstr(" = back): ");
 		}
 		else
-		{
 			ask = 1;
-		}
 
 		/* Do it */
-		switch(toupper(getchr()))
+		tmp=getchr();
+
+	      	if (isalpha(tmp))
+      		{
+        	  if (islower(tmp))
+          	    tmp=toupper(tmp);
+      		}
+
+		switch(tmp)
 		{
 			case 'N'   : run = MenuNew(); break;
 			case 'O'   : run = MenuOpen(); break;
@@ -632,6 +723,7 @@ Menu()
 			case 'B'   : MenuAbout(); menu = 1; break;
 			case 'H'   : MenuHelp(); menu = 1; break;
 			case 'X'   : run = stay = MenuExit(); break;
+			case 'M'   : MenuFreeMemory(); menu = 1; break;
 			case K_ESC : run = 0; break;
 			default    : ask = 0; break;
 		}
@@ -650,7 +742,7 @@ Menu()
    ----------------
    Return Z to quit the menu.
 */
-MenuNew()
+int MenuNew(void)
 {
 	if(lp_chg)
 	{
@@ -667,7 +759,7 @@ MenuNew()
    -----------------
    Return Z to quit the menu.
 */
-MenuOpen()
+int MenuOpen(void)
 {
 	char fn[FILENAME_MAX];
 
@@ -696,7 +788,7 @@ MenuOpen()
    -----------------
    Return Z to quit the menu.
 */
-MenuSave()
+int MenuSave(void)
 {
 	if(!file_name[0])
 		return MenuSaveAs();
@@ -710,7 +802,7 @@ MenuSave()
    --------------------
    Return Z to quit the menu.
 */
-MenuSaveAs()
+int MenuSaveAs(void)
 {
 	char fn[FILENAME_MAX];
 
@@ -727,10 +819,26 @@ MenuSaveAs()
 	return 1;
 }
 
+/* Menu option: available Memory
+   -----------------
+*/
+void MenuFreeMemory(void)
+{
+	int freeMem;
+	int row;
+
+	ClearBox();
+	row = BOX_ROW + 1;
+	freeMem = GetTotalFree();
+	sprintf(tmpbuf, "%u KB available memory", freeMem);
+	CenterText(row, tmpbuf);
+	SysLineBack(NULL);
+}
+
 /* Menu option: Help
    -----------------
 */
-MenuHelp()
+void MenuHelp(void)
 {
 	int i, k;
 	char *s;
@@ -743,18 +851,19 @@ MenuHelp()
 
 #if CRT_LONG
 
-	for(i = 0; help_items[i] != -1; ++i) {
+	for(i = 0; help_items[i] != -1; ++i) 
+	{
+		/* 123456789012345 (15 characters) */
+		/* BlkEnd     ^B^E */
 
-		// 123456789012345 (15 characters)
-		// BlkEnd     ^B^E
-
-		if((k = help_items[i])) {
-			if(*(s = GetKeyWhat(k)) == '?') {
+		if((k = help_items[i])) 
+		{
+			if(*(s = GetKeyWhat(k)) == '?')
 				k = 0;
-			}
 		}
 
-		if(k) {
+		if(k) 
+		{
 			putstr(s); putchrx(' ', 11 - strlen(s));
 
 			k -= 1000;
@@ -762,16 +871,15 @@ MenuHelp()
 			MenuHelpCh(cf_keys[k]);
 			MenuHelpCh(cf_keys_ex[k]);
 		}
-		else {
+		else 
 			putchrx(' ', 15);
-		}
 
-		if((i + 1) % 3) {
+		if((i + 1) % 3)
+		{ 
 			putchr(' '); putchr(cf_vert_chr); putchr(' ');
 		}
-		else {
+		else 
 			putchr('\n');
-		}
 	}
 
 #else
@@ -783,18 +891,20 @@ MenuHelp()
 	SysLineBack(NULL);
 }
 
-MenuHelpCh(ch)
-int ch;
+void MenuHelpCh(char ch)
 {
 	if(ch) {
-		if(ch < 32 || ch == 0x7F) {
+		if(ch < 32 || ch == 0x7F) 
+		{
 			putchr('^'); putchr(ch != 0x7F ? '@' + ch : '?');
 		}
-		else {
+		else 
+		{
 			putchr(ch); putchr(' ');
 		}
 	}
-	else {
+	else 
+	{
 		putchr(' '); putchr(' ');
 	}
 }
@@ -802,7 +912,7 @@ int ch;
 /* Menu option: About
    ------------------
 */
-MenuAbout()
+void MenuAbout(void)
 {
 	int row;
 
@@ -812,17 +922,16 @@ MenuAbout()
 	ClearBox();
 
 	CenterText(row++, "te - Text Editor");
-	row++;
 	CenterText(row++, VERSION);
-	row++;
 	CenterText(row++, "Configured for");
 	CenterText(row++, cf_name);
-	row++;
 	CenterText(row++, COPYRIGHT);
-	row++;
 	CenterText(row++, "http://www.floppysoftware.es");
 	CenterText(row++, "https://cpm-connections.blogspot.com");
-	CenterText(row  , "floppysoftware@gmail.com");
+	CenterText(row++  , "floppysoftware@gmail.com");
+	CenterText(row++, "Adapted for RC2014's 512KB RAM + 512KB ROM Memory module");
+	CenterText(row++, "by Ladislau Szilagyi");
+	CenterText(row, "http://www.euroqst.ro");
 #else
 	row = BOX_ROW;
 
@@ -834,6 +943,9 @@ MenuAbout()
 	CenterText(row++, cf_name);
 	CenterText(row++, COPYRIGHT);
 	CenterText(row++, "www.floppysoftware.es");
+	CenterText(row++, "Adapted for RC2014's 512KB RAM + 512KB ROM Memory module");
+	CenterText(row++, "by Ladislau Szilagyi");
+	CenterText(row, "http://www.euroqst.ro");
 #endif
 
 	SysLineBack(NULL);
@@ -842,15 +954,11 @@ MenuAbout()
 /* Menu option: Quit program
    -------------------------
 */
-MenuExit()
+int MenuExit(void)
 {
 	if(lp_chg)
-	{
 		return !SysLineChanges();
-	}
 
 	/* Quit program */
 	return 0;
 }
-
-

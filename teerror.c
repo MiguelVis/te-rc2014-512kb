@@ -24,11 +24,24 @@
 
 	30 Jan 2018 : Extracted from te.c.
 	25 Sep 2021 : Restore system message and cursor position when editing in ErrLine().
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 */
+
+#include <te.h>
 
 /* Print error message and wait for a key press
    --------------------------------------------
 */
+
+extern int box_shr;  /* Vertical   position of cursor in the box (0..box_rows - 1) */
+extern int box_shc;  /* Horizontal position of cursor in the box (0..cf_cols - 1) */
+extern unsigned char cf_num;
+extern int sysln;    /* NZ when written - for Loop() */
+extern int editln;   /* NZ when editing line - for ErrLine() */
+
+void SysLineCont(char*);
+void SysLineEdit(void);
+
 ErrLine(s)
 char *s;
 {

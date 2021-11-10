@@ -1,6 +1,6 @@
-/*	te_ansi.c
+/*	te_ws100.c
 
-	Text editor -- version for the ANSI terminal.
+	Text editor -- version for VT100 & WordStar keys, under CP/M.
 
 	Copyright (c) 2015-2021 Miguel Garcia / FloppySoftware
 
@@ -20,65 +20,58 @@
 
 	Usage:
 
-	te_ansi [filename]
+	te_ws100 [filename]
 
 	Compilation:
 
-	cc te_ansi
-	ccopt te_ansi
-	zsm te_ansi
-	hextocom te_ansi
+	cc te_ws100
+	ccopt te_ws100
+	zsm te_ws100
+	hextocom te_ws100
 
 	Changes:
 
-	20 Oct 2020 : 1st version from source for the Takeda Toshiya's CP/M emulator.
+	12 May 2015 : 1st version.
+	14 May 2015 : Completed adaptation for WS keys.
+	02 Jun 2016 : Minor changes.
+	11 Jun 2016 : Minor changes in help text.
+	24 Jan 2018 : Find & find next keys.
+	26 Jan 2018 : Key to execute macro from file.
+	04 Feb 2018 : Key to go to line #.
+	30 Dec 2018 : Refactorized i/o functions.
+	15 Jan 2019 : Added CrtReverse().
+	18 Jan 2019 : Added K_DELETE.
+	23 Jan 2019 : Modified a lot for key bindings support.
+	29 Jan 2019 : Added K_CLRCLP.
+	24 Dec 2019 : Added OPT_NUM.
+	26 Dec 2019 : Now K_INTRO is K_CR. Remove CRT_ESC_KEY.
 	14 Jan 2021 : Remove OPT_NUM.
 	22 Feb 2021 : Move CRT_ROWS, CRT_COLS to assembler.
 	04 Apr 2021 : Remove key bindings.
 	11 May 2021 : Remove CRT configuration values.
 	30 Jun 2021 : Added CRT_DEF_ROWS, CRT_DEF_COLS.
 	06 Jul 2021 : Optimize CrtOut().
+	   Oct 2021 : (Ladislau Szilagyi) Adapted for RC2014's 512KB RAM memory module
 
 	Notes:
 
-	It emulates a 25x80 ANSI terminal.
-
-	It needs to translate some keyboard codes.
+	-
 */
 
-/* Default configuration values
-   ----------------------------
-*/
-#define CRT_DEF_ROWS 25
-#define CRT_DEF_COLS 80
-
-/* Options
-   -------
-   Set to 1 to add the following functionalities, else 0.
-*/
-#define OPT_LWORD 0  /* Go to word on the left */
-#define OPT_RWORD 0  /* Go to word on the right */
-#define OPT_FIND  1  /* Find string */
-#define OPT_GOTO  1  /* Go to line # */
-#define OPT_BLOCK 1  /* Block selection */
-#define OPT_MACRO 1  /* Enable macros */
-
-/* Include main code
-   -----------------
-*/
-#include "te.c"
+#include <te.h>
+#include <tekeys.h>
 
 /* Setup CRT: Used when the editor starts
    --------------------------------------
-   void CrtSetup(void)
 */
-CrtSetup()
+void CrtSetup(void)
 {
 	CrtSetupEx();
 }
 
 #asm
-CrtSetupEx:
+global _CrtSetupEx
+_CrtSetupEx:
 	ld  hl,(1)
 	inc hl
 	inc hl
@@ -104,80 +97,51 @@ CrtReset()
 /* Output character to the CRT
    ---------------------------
    All program output is done with this function.
-
+   
    On '\n' outputs '\n' + '\r'.
 
-   void CrtOut(int ch)
 */
+void CrtOut(int ch);
+
 #asm
-CrtOut:
-	ld   c,l
-	ld   a,l
-	cp   10
-	jp   nz,BiosConout
-	call BiosConout
-	ld   c,13
-	jp   BiosConout
+global _CrtOut
+_CrtOut:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)  ;ch
+        ld      a,c
+        cp   10
+        jp   nz,BiosConout
+        call BiosConout
+        ld   c,13
+        jp   BiosConout
 #endasm
 
 /* Input character from the keyboard
    ---------------------------------
    All program input is done with this function.
 
-   Translates the ANSI key codes into single characters.
+   Translate WordStar key sequences to TE key codes.
+*/
+int CrtInEx(void);
 
    int CrtIn(void)
-*/
-CrtIn()
 {
 	int ch;
 
-	ch = CrtInEx();
-
-	/* Translate key codes begining with 0x1B (ESC) */
-
-	if(ch == 0x1B)
-	{
-		if(CrtInSt())
-		{
-			ch = 0;
-
-			if(CrtInEx() == '[')
-			{
-				if(CrtInSt())
-				{
-					switch(CrtInEx())
-					{
-						case 'A' : /* UP */
-							return CTL_E;
-						case 'B' : /* DOWN */
-							return CTL_X;
-						case 'C' : /* RIGHT */
-							return CTL_D;
-						case 'D' : /* LEFT */
-							return CTL_S;
-						case 'H' : /* HOME */
-							return CTL_V;
-						case 'F' : /* END */
-							return CTL_A;
-					}
-				}
-
-			}
-		}
+	switch(ch = CrtInEx()) {
+		case DEL :   /* DEL == CTL_H */
+			return CTL_H;
+		case CTL_N : /* ^N == ^M */
+			return CTL_M;
 	}
-
+	
 	return ch;
 }
 
 #asm
-CrtInSt:
-	call BiosConst
-	ld h,0
-	ld l,a
-	ret
-	
-CrtInEx:
+global _CrtInEx
+_CrtInEx:
 	call BiosConin
 	ld h,0
 	ld l,a
@@ -233,4 +197,3 @@ int on;
 	CrtOut(27); CrtOut('['); CrtOut(on ? '7' : '0'); CrtOut('m');
 }
 
-
