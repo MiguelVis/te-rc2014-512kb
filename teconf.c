@@ -76,7 +76,7 @@ _cf_name:        ; 32 bytes > Configuration name + ZERO.
               defb 0,0,0,0,0,0,0,0
 
 _cf_rows:      defb 50               ;  1 byte  > Screen rows or 0 for auto.
-_cf_cols:      defb 104               ;  1 byte  > Screen columns or 0 for auto.
+_cf_cols:      defb 120               ;  1 byte  > Screen columns or 0 for auto.
 
 _cf_mx_lines:  defw 8186               ;  2 bytes > Max. number of lines in editor.
                                     ;            Each line takes 2 bytes (1 word) of memory.
@@ -178,13 +178,9 @@ _cf_bytes:     defw $ - cf_start + 2 ;  2 bytes > Block configuration size in by
 
 global _clp_arr
 global _clp_arr_i_bank
-global _ln_dat
-global _fe_dat
 
 _clp_arr:	defs	512*2	;Multi-line clipboard lines pointers array
 _clp_arr_i_bank:defs	512	;Multi-line clipboard lines memory banks array
-_ln_dat:	defs	128	;current line (CRT_DEF_COLS+1)
-_fe_dat:	defs	256	;FORCED_MAX * 2
 
 #endasm
 

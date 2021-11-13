@@ -152,7 +152,7 @@ int   lp_chg; /* 0 if no changes are made */
 /* Current line
    ------------
 */
-extern char ln_dat[]; /* Data buffer */
+char ln_dat[128]; /* Data buffer */
 int   ln_max; /* Max. # of characters */
 
 /* Clipboard & block selection
@@ -191,7 +191,7 @@ int box_shc;  /* Horizontal position of cursor in the box (0..cf_cols - 1) */
 /* Keyboard forced entry
    ---------------------
 */
-extern int fe_dat[];   /* Data buffer */
+int fe_dat[FORCED_MAX];   /* Data buffer */
 int fe_now;    /* How many characters are now in the buffer */
 int fe_set;    /* Set position */
 int fe_get;    /* Get position */

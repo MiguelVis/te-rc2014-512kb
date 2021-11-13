@@ -29,15 +29,18 @@ AVAILABLE	equ	0
 
 	psect	bss
 
-	org	7880H
+	org	0C600H
 ;
-;	The following buffers size is 76AH
-;	Therefore, we are below 8000H (where the slices of dynamic memory are loaded)
+;	The area from C000H to C600H is used by the following buffers: (see teconf.c )
 ;
+;_clp_arr:	defs	512*2	;Multi-line clipboard lines pointers array
+;_clp_arr_i_bank:defs	512	;Multi-line clipboard lines memory banks array
+
 ;	IMPORTANT NOTE
 ;
-;	It is wise to keep a "safe" 200H zone between the top of C library's BSS 
-;	and the current BSS at 7880H
+;	The following buffers size is 76AH, therefore, we are below CE00H
+;	It is wise to keep a "safe" 200H zone between the top of stack (D000H in the worst case)
+;	and the current BSS top ( C library routines use ~ 1E0H stack space )
 ;
 ;	Available block list headers
 ;

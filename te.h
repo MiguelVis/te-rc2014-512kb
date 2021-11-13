@@ -90,7 +90,7 @@
 
 #define OPT_Z80    1  /* Write some things as Z80 assembler */
 
-#define FILENAME_MAX 13
+#define FILENAME_MAX 14
 #define FORCED_MAX 128   /* Keyboard forced entry buffer size (for paste, tabs, etc.) */
 
 #define FIND_MAX   32    /* Find string buffer size */
